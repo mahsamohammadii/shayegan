@@ -309,6 +309,57 @@ function ProductContent({ slugParam, src, zoom = 3 }) {
                 const faDesc = mainProduct.description?.fa || (typeof mainProduct.description === 'string' ? mainProduct.description : '') || '';
                 const enDesc = mainProduct.description?.en || (typeof mainProduct.description === 'string' ? mainProduct.description : '') || '';
 
+                // Dynamically update page title & meta tags on client side
+                if (typeof document !== 'undefined' && faName && faName !== 'محصول') {
+                    document.title = faName;
+
+                    const descPlain = faDesc ? faDesc.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : faName;
+                    const canonicalUrl = `https://shayegandesign.com/product/${slug}`;
+
+                    const firstImg = mainProduct.images?.[0];
+                    const imgUrl = typeof firstImg === 'string'
+                        ? firstImg
+                        : (firstImg?.url || firstImg?.thumbnailUrl || firstImg?.renditions?.[0]?.url || "https://shayegandesign.com/images/logo.png");
+
+                    const updateMeta = (attrName, attrVal, contentVal) => {
+                        let el = document.querySelector(`meta[${attrName}="${attrVal}"]`);
+                        if (!el) {
+                            el = document.createElement('meta');
+                            el.setAttribute(attrName, attrVal);
+                            document.head.appendChild(el);
+                        }
+                        el.setAttribute('content', contentVal);
+                    };
+
+                    updateMeta('name', 'title', faName);
+                    updateMeta('name', 'meta_title', faName);
+                    updateMeta('property', 'og:title', faName);
+                    updateMeta('name', 'meta_ogtitle', faName);
+
+                    updateMeta('name', 'description', descPlain);
+                    updateMeta('name', 'meta_description', descPlain);
+                    updateMeta('property', 'og:description', descPlain);
+                    updateMeta('name', 'meta_ogdescription', descPlain);
+
+                    updateMeta('name', 'meta_canonical', canonicalUrl);
+                    updateMeta('property', 'og:url', canonicalUrl);
+                    updateMeta('name', 'meta_ogurl', canonicalUrl);
+
+                    updateMeta('property', 'og:image', imgUrl);
+                    updateMeta('name', 'meta_ogimage', imgUrl);
+
+                    updateMeta('name', 'robots', 'index, follow');
+                    updateMeta('name', 'meta_robots', 'index, follow');
+
+                    let linkCanonical = document.querySelector('link[rel="canonical"]');
+                    if (!linkCanonical) {
+                        linkCanonical = document.createElement('link');
+                        linkCanonical.setAttribute('rel', 'canonical');
+                        document.head.appendChild(linkCanonical);
+                    }
+                    linkCanonical.setAttribute('href', canonicalUrl);
+                }
+
                 // Extract background-color attribute if present
                 let bgAttrColor = null;
                 if (mainProduct.attributes && Array.isArray(mainProduct.attributes)) {
@@ -1040,35 +1091,45 @@ function ProductContent({ slugParam, src, zoom = 3 }) {
                     </div>
                 
                     {/* Section 2: Description & Specifications */}
-                    <div dir={locale === "fa" ? "rtl" : "ltr"} className="relative md:mt-8 sm:mt-3 mb-16 w-[90%] ml-[5%]">
-                        <motion.div variants={tableanime} initial="hidden" animate="show" style={{ background: datas.color || '#ffffff' }} className="border-b border-gray-500 flex gap-2 w-full mx-auto py-2 px-3 md:text-[18px] sm:text-[14px] text-[#47221C]">
-                            <button className="mx-auto font-bold">
-                                {locale === "fa" ? ` توضیحات ` : ` Description`}
-                            </button>
-                        </motion.div>
-                        {/* <motion.p variants={tableanime} initial="hidden" animate="show" className="md:mt-7 sm:mt-5 md:text-[15px] sm:text-[12px] text-[#47221C] flex flex-wrap mt-3 leading-relaxed">
-                           
-                        </motion.p> */}
-                         <motion.div className="md:mt-7 sm:mt-5 text-[#47221C]" variants={tableanime} initial="hidden" animate="show" dangerouslySetInnerHTML={{ __html:( `${locale === "fa" ? datas.descFa : datas.descEn}`)}}/> 
+                    {(() => {
+                        const descContent = locale === "fa" ? datas.descFa : datas.descEn;
+                        const hasDescription = Boolean(descContent && descContent.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim());
 
-                        {features.length > 0 && (
-                            <div className="mt-8">
-                                <motion.h3 variants={tableanime} initial="hidden" animate="show" className="font-bold md:text-[18px] sm:text-[14px] text-[#47221C] mb-3 border-b border-gray-400 pb-2">
-                                    {locale === "fa" ? "مشخصات محصول" : "Product Specifications"}
-                                </motion.h3>
-                                <motion.ul initial="hidden" animate="show" variants={tableanime}>
-                                    {features.map((box, boxIndex) => {
-                                        return (
-                                            <li key={boxIndex} className="border-b border-[#41241e] w-full flex gap-5 justify-between mt-3 pb-1 text-[#47221C] md:text-[15px] sm:text-[12px]">
-                                                <span>{locale === "fa" ? `${box.feature_fa_name}` : `${box.feature_en_name}`}</span>
-                                                <span>{locale === "fa" ? `${box.fa_value}` : `${box.en_value}`}</span>
-                                            </li>
-                                        )
-                                    })}
-                                </motion.ul>
+                        if (!hasDescription && (!features || features.length === 0)) return null;
+
+                        return (
+                            <div dir={locale === "fa" ? "rtl" : "ltr"} className="relative md:mt-8 sm:mt-3 mb-16 w-[90%] ml-[5%]">
+                                {hasDescription && (
+                                    <>
+                                        <motion.div variants={tableanime} initial="hidden" animate="show" style={{ background: datas.color || '#ffffff' }} className="border-b border-gray-500 flex gap-2 w-full mx-auto py-2 px-3 md:text-[18px] sm:text-[14px] text-[#47221C]">
+                                            <button className="mx-auto font-bold">
+                                                {locale === "fa" ? ` توضیحات ` : ` Description`}
+                                            </button>
+                                        </motion.div>
+                                        <motion.div className="md:mt-7 sm:mt-5 text-[#47221C]" variants={tableanime} initial="hidden" animate="show" dangerouslySetInnerHTML={{ __html: descContent }}/> 
+                                    </>
+                                )}
+
+                                {features && features.length > 0 && (
+                                    <div className={hasDescription ? "mt-8" : ""}>
+                                        <motion.h3 variants={tableanime} initial="hidden" animate="show" className="font-bold md:text-[18px] sm:text-[14px] text-[#47221C] mb-3 border-b border-gray-400 pb-2">
+                                            {locale === "fa" ? "مشخصات محصول" : "Product Specifications"}
+                                        </motion.h3>
+                                        <motion.ul initial="hidden" animate="show" variants={tableanime}>
+                                            {features.map((box, boxIndex) => {
+                                                return (
+                                                    <li key={boxIndex} className="border-b border-[#41241e] w-full flex gap-5 justify-between mt-3 pb-1 text-[#47221C] md:text-[15px] sm:text-[12px]">
+                                                        <span>{locale === "fa" ? `${box.feature_fa_name}` : `${box.feature_en_name}`}</span>
+                                                        <span>{locale === "fa" ? `${box.fa_value}` : `${box.en_value}`}</span>
+                                                    </li>
+                                                )
+                                            })}
+                                        </motion.ul>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        );
+                    })()}
                 
                     {/* Section 3: Similar Products (Horizontal Slider) */}
                     {products.length > 0 && (

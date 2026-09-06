@@ -18,6 +18,20 @@ const boxVar       = { hidden: { opacity: 0, y: 50 }, visible: (i) => ({ opacity
 const imgVar       = { hidden: { scale: 0, opacity: 0 }, visible: (i) => ({ opacity: 1, scale: 1, transition: { delay: i * 0.08, duration: 0.5, ease: "easeOut" } }) };
 const labelVar     = { hidden: { x: -60, opacity: 0 }, visible: (i) => ({ x: 0, opacity: 1, transition: { delay: i * 0.5, duration: 1.5, ease: "easeOut" } }) };
 
+function getImageUrl(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  return (
+    img.url ||
+    img.thumbnailUrl ||
+    img.path ||
+    img.renditions?.find(r => r.name === 'medium')?.url ||
+    img.renditions?.find(r => r.name === 'large')?.url ||
+    img.renditions?.[0]?.url ||
+    ""
+  );
+}
+
 // ─── Single product card with horizontal drag ─────────────────────────────────
 function ProductCard({ product, index, locale, router }) {
   const images = product.images?.length ? product.images : [];
@@ -27,7 +41,7 @@ function ProductCard({ product, index, locale, router }) {
   const [cardWidth,  setCardWidth]  = useState(0);
   const startX      = useRef(null);
   const dragging    = useRef(false);
-  const threshold   = 80;
+  const threshold   = 50;
 
   const startDrag = (x) => { startX.current = x; dragging.current = true; };
   const moveDrag  = (x) => { if (!dragging.current) return; setDragX((x - startX.current) * 0.6); };
@@ -55,7 +69,11 @@ function ProductCard({ product, index, locale, router }) {
       onMouseLeave={() => setHovered(false)}
     >
       {/* Image slider */}
-      <motion.div className="relative w-full h-64 overflow-hidden rounded-lg bg-white/70 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-2xl transition-all duration-300 cursor-pointer">
+      <motion.div
+        ref={(el) => { if (el) setCardWidth(el.offsetWidth); }}
+        dir="ltr"
+        className="relative w-full h-64 overflow-hidden rounded-lg bg-white/70 backdrop-blur-sm border border-gray-200 shadow-sm hover:shadow-2xl transition-all duration-300 cursor-pointer"
+      >
         <div
           style={{ width: "100%", overflow: "hidden", touchAction: "none", userSelect: "none" }}
           onTouchStart={(e) => startDrag(e.touches[0].clientX)}
@@ -69,27 +87,21 @@ function ProductCard({ product, index, locale, router }) {
           <motion.div
             style={{ display: "flex", cursor: "grab" }}
             animate={{ x: -(current * cardWidth) + dragX }}
-            transition={{ type: "spring", stiffness: 80, damping: 50, mass: 1 }}
+            transition={{ type: "spring", stiffness: 120, damping: 20, mass: 0.8 }}
           >
             {images.length ? images.map((img, i) => (
-              <motion.div
+              <div
                 key={i}
-                ref={(el) => { if (el && i === 0) setCardWidth(el.offsetWidth); }}
                 style={{ minWidth: "100%" }}
-                className="flex items-center justify-center relative"
-                variants={imgVar}
-                custom={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, amount: 0.2 }}
+                className="flex items-center justify-center relative h-64"
               >
                 <img
-                  src={img.url || img.thumbnailUrl || ""}
+                  src={getImageUrl(img)}
                   alt={name || `slide-${i}`}
                   draggable={false}
                   className="pointer-events-none h-64 md:w-[55%] sm:w-[70%] object-contain"
                 />
-              </motion.div>
+              </div>
             )) : (
               <div style={{ minWidth: "100%" }} className="flex items-center justify-center h-64 text-gray-300 text-sm">
                 {locale === "fa" ? "بدون تصویر" : "No image"}
@@ -100,7 +112,7 @@ function ProductCard({ product, index, locale, router }) {
 
         {/* Progress bar */}
         {images.length > 1 && (
-          <div className="absolute bottom-2 left-0 right-0 h-[3px] bg-gray-200 rounded-full mx-2">
+          <div className="absolute bottom-2 left-0 right-0 h-[3px] bg-gray-200 rounded-full mx-2" dir="ltr">
             <div
               className="h-[3px] bg-[#786548] rounded-full transition-all duration-300"
               style={{ width: `${((current + 1) / images.length) * 100}%` }}

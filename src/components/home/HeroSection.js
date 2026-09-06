@@ -38,6 +38,7 @@ function PlateGallery2() {
   const [sortedGrid, setSortedGrid] = useState([]);
   const [notsortedGrid, setNotsortedGrid] = useState([]);
   const [productImages, setProductImages] = useState({});
+  const [isSorted, setIsSorted] = useState(false);
 
   useEffect(() => {
     // ─── Fetch sorted-grid content item for Home Page subtitle ─────────────
@@ -80,6 +81,7 @@ function PlateGallery2() {
   let raf;
 
   useEffect(() => {
+    if (isSorted) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -87,87 +89,149 @@ function PlateGallery2() {
     current.current.y = container.scrollTop;
 
     const loop = () => {
+      if (!containerRef.current) return;
       current.current.x += (target.current.x - current.current.x) * lerp;
       current.current.y += (target.current.y - current.current.y) * lerp;
 
-      container.scrollLeft = current.current.x;
-      container.scrollTop = current.current.y;
+      containerRef.current.scrollLeft = current.current.x;
+      containerRef.current.scrollTop = current.current.y;
 
       raf = requestAnimationFrame(loop);
     };
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [isSorted]);
 
   useEffect(() => {
+    if (isSorted) return;
     const container = containerRef.current;
     if (!container) return;
 
-    const content = container.firstElementChild;
-    if (!content) return;
+    const centerGrid = () => {
+      const content = container.firstElementChild;
+      if (!content) return;
 
-    const centerX = (content.offsetWidth - container.clientWidth) / 2;
-    const centerY = (content.offsetHeight - container.clientHeight) / 2;
+      const centerX = Math.max(0, (content.offsetWidth - container.clientWidth) / 2);
+      const centerY = Math.max(0, (content.offsetHeight - container.clientHeight) / 2);
 
-    current.current.x = centerX;
-    current.current.y = centerY;
-    target.current.x = centerX;
-    target.current.y = centerY;
+      current.current.x = centerX;
+      current.current.y = centerY;
+      target.current.x = centerX;
+      target.current.y = centerY;
 
-    container.scrollLeft = centerX;
-    container.scrollTop = centerY;
-  }, [notsortedGrid.length]);
+      container.scrollLeft = centerX;
+      container.scrollTop = centerY;
+    };
+
+    centerGrid();
+    const timer = setTimeout(centerGrid, 60);
+    return () => clearTimeout(timer);
+  }, [isSorted, notsortedGrid.length]);
 
   useEffect(() => {
+    if (isSorted) return;
     const container = containerRef.current;
     if (!container) return;
 
     const onWheel = (e) => {
       e.preventDefault();
-      target.current.x += e.deltaX;
-      target.current.y += e.deltaY;
+      const maxScrollX = Math.max(0, container.scrollWidth - container.clientWidth);
+      const maxScrollY = Math.max(0, container.scrollHeight - container.clientHeight);
+
+      target.current.x = Math.max(0, Math.min(maxScrollX, target.current.x + e.deltaX));
+      target.current.y = Math.max(0, Math.min(maxScrollY, target.current.y + e.deltaY));
     };
 
     container.addEventListener("wheel", onWheel, { passive: false });
     return () => container.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [isSorted]);
+
+  const lastTime = useRef(0);
+  const isMoved = useRef(false);
 
   const startDrag = (clientX, clientY) => {
     isDown.current = true;
+    isMoved.current = false;
     lastPos.current = { x: clientX, y: clientY };
+    lastTime.current = performance.now();
+    velocity.current = { x: 0, y: 0 };
 
     const container = containerRef.current;
-    target.current.x = container.scrollLeft;
-    target.current.y = container.scrollTop;
+    if (container) {
+      target.current.x = container.scrollLeft;
+      target.current.y = container.scrollTop;
+    }
   };
 
   const moveDrag = (clientX, clientY) => {
     if (!isDown.current) return;
 
+    const now = performance.now();
+    const dt = Math.max(1, now - lastTime.current);
+
     const dx = clientX - lastPos.current.x;
     const dy = clientY - lastPos.current.y;
 
-    target.current.x -= dx;
-    target.current.y -= dy;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      isMoved.current = true;
+      setDraggingStarted(true);
+    }
 
-    velocity.current.x = dx;
-    velocity.current.y = dy;
+    const container = containerRef.current;
+    if (container) {
+      const maxScrollX = Math.max(0, container.scrollWidth - container.clientWidth);
+      const maxScrollY = Math.max(0, container.scrollHeight - container.clientHeight);
+
+      target.current.x = Math.max(0, Math.min(maxScrollX, target.current.x - dx));
+      target.current.y = Math.max(0, Math.min(maxScrollY, target.current.y - dy));
+    } else {
+      target.current.x -= dx;
+      target.current.y -= dy;
+    }
+
+    const instVx = (dx / dt) * 16.6;
+    const instVy = (dy / dt) * 16.6;
+
+    velocity.current.x = velocity.current.x * 0.3 + instVx * 0.7;
+    velocity.current.y = velocity.current.y * 0.3 + instVy * 0.7;
 
     lastPos.current = { x: clientX, y: clientY };
+    lastTime.current = now;
   };
 
   const endDrag = () => {
+    if (!isDown.current) return;
     isDown.current = false;
 
+    if (isMoved.current) {
+      setTimeout(() => setDraggingStarted(false), 100);
+    } else {
+      setDraggingStarted(false);
+    }
+
+    const timeSinceLastMove = performance.now() - lastTime.current;
+    if (timeSinceLastMove > 80) {
+      velocity.current = { x: 0, y: 0 };
+    }
+
     const inertia = () => {
-      velocity.current.x *= 0.92;
-      velocity.current.y *= 0.92;
+      velocity.current.x *= 0.95;
+      velocity.current.y *= 0.95;
 
-      target.current.x -= velocity.current.x;
-      target.current.y -= velocity.current.y;
+      const container = containerRef.current;
+      if (container) {
+        const maxScrollX = Math.max(0, container.scrollWidth - container.clientWidth);
+        const maxScrollY = Math.max(0, container.scrollHeight - container.clientHeight);
 
-      if (Math.abs(velocity.current.x) > 0.5 || Math.abs(velocity.current.y) > 0.5) {
+        target.current.x = Math.max(0, Math.min(maxScrollX, target.current.x - velocity.current.x));
+        target.current.y = Math.max(0, Math.min(maxScrollY, target.current.y - velocity.current.y));
+      } else {
+        target.current.x -= velocity.current.x;
+        target.current.y -= velocity.current.y;
+      }
+
+      if (Math.abs(velocity.current.x) > 0.1 || Math.abs(velocity.current.y) > 0.1) {
         requestAnimationFrame(inertia);
       }
     };
@@ -176,25 +240,70 @@ function PlateGallery2() {
   };
 
   useEffect(() => {
-    if (notsortedGrid.length === 0) return;
+    if (isSorted) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const id = entry.target.getAttribute("data-id");
-          if (entry.isIntersecting) {
-            setVisiblePlates((prev) => ({ ...prev, [id]: true }));
-          }
-        });
-      },
-      { threshold: 0.3 }
-    );
+    const handleTouchStart = (e) => {
+      if (selected) return;
+      if (e.touches && e.touches.length > 0) {
+        startDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
 
-    const items = document.querySelectorAll(".plate-item");
-    items.forEach((item) => observer.observe(item));
+    const handleTouchMove = (e) => {
+      if (selected) return;
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      if (e.touches && e.touches.length > 0) {
+        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
 
-    return () => observer.disconnect();
-  }, [notsortedGrid]);
+    const handleTouchEnd = () => {
+      endDrag();
+    };
+
+    container.addEventListener("touchstart", handleTouchStart, { passive: false });
+    container.addEventListener("touchmove", handleTouchMove, { passive: false });
+    container.addEventListener("touchend", handleTouchEnd, { passive: false });
+    container.addEventListener("touchcancel", handleTouchEnd, { passive: false });
+
+    return () => {
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      container.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [isSorted, selected]);
+
+  useEffect(() => {
+    if (isSorted || notsortedGrid.length === 0) return;
+
+    let observer;
+    const timer = setTimeout(() => {
+      observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const id = entry.target.getAttribute("data-id");
+            if (entry.isIntersecting) {
+              setVisiblePlates((prev) => ({ ...prev, [id]: true }));
+            }
+          });
+        },
+        { threshold: 0.2 }
+      );
+
+      const items = document.querySelectorAll(".plate-item");
+      items.forEach((item) => observer.observe(item));
+    }, 60);
+
+    return () => {
+      clearTimeout(timer);
+      if (observer) observer.disconnect();
+    };
+  }, [isSorted, notsortedGrid]);
 
   const container = {
     hidden: {},
@@ -221,7 +330,6 @@ function PlateGallery2() {
       .catch(console.error);
   }, [selected]);
 
-  const [isSorted, setIsSorted] = useState(false);
   const handleClick = () => {
     setIsSorted(!isSorted);
   };
@@ -451,10 +559,7 @@ function PlateGallery2() {
             onMouseMove={(e) => !selected && moveDrag(e.clientX, e.clientY)}
             onMouseUp={endDrag}
             onMouseLeave={endDrag}
-            onTouchStart={(e) => !selected && startDrag(e.touches[0].clientX, e.touches[0].clientY)}
-            onTouchMove={(e) => !selected && moveDrag(e.touches[0].clientX, e.touches[0].clientY)}
-            onTouchEnd={endDrag}
-            style={{ pointerEvents: selected ? "none" : "auto" }}
+            style={{ pointerEvents: selected ? "none" : "auto", touchAction: "none" }}
             onClick={() => !selected && setIsSorted(false)}
           >
             <motion.div
@@ -481,15 +586,15 @@ function PlateGallery2() {
                     whileTap={!isSelected ? { scale: 0.95 } : {}}
                   >
                     <div className="w-full h-full overflow-hidden m-auto flex items-center justify-center">
-                      <img
+                      <motion.img
+                        layoutId={`product-img-${p._id}`}
                         onMouseMove={(e) => handleMouseMove(e, `${locale === "fa" ? `${p.name.fa}` : `${p.name.en}`}`)}
                         onMouseLeave={hideTooltip}
                         draggable="false"
                         onClick={() => {
                           if (!draggingStarted) {
-                            setSelected(null);
                             setSelectedid(p._id);
-                            setTimeout(() => setSelected(p), 300);
+                            setSelected(p);
                           }
                         }}
                         src={productImages[p._id]}
@@ -498,10 +603,11 @@ function PlateGallery2() {
                           width: 200,
                           height: 200,
                           marginBottom: p._id % 2 === 0 ? '70px' : '0px',
-                          opacity: isSelected ? 0.3 : 1,
+                          opacity: isSelected ? 0.1 : 1,
                           pointerEvents: isSelected ? 'none' : 'auto',
                         }}
-                        className="object-contain cursor-pointer transition-opacity duration-300"
+                        className="object-contain cursor-pointer"
+                        transition={{ type: "spring", stiffness: 220, damping: 25 }}
                       />
                     </div>
                   </motion.div>
@@ -520,7 +626,9 @@ function PlateGallery2() {
           )}
 
           <AnimatePresence>
-            {selected && (
+            {selected && (() => {
+              const displayImages = collectionImages.length > 0 ? collectionImages : [selected];
+              return (
               <motion.aside
                 initial={{ x: -420, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
@@ -552,13 +660,13 @@ function PlateGallery2() {
                     className="md:text-[25px] sm:text-[18px] font-bold absolute z-50 right-5 top-5 text-[#363635]"
                   >
                     {locale === "fa"
-                      ? (collectionImages[currentIndex]?.name?.fa || selected?.name?.fa || '')
-                      : (collectionImages[currentIndex]?.name?.en || selected?.name?.en || '')}
+                      ? (displayImages[currentIndex]?.name?.fa || selected?.name?.fa || '')
+                      : (displayImages[currentIndex]?.name?.en || selected?.name?.en || '')}
                   </motion.h1>
                 </AnimatePresence>
                 <div className="flex h-[100vh]">
                   <div style={{ overflowY: "auto" }} className="md:w-[130px] border-r border-black hidden md:block py-5 md:px-2 sm:px-1 md:pl-5 sm:pl-1">
-                    {collectionImages.map((src, i) => (
+                    {displayImages.map((src, i) => (
                       <div
                         key={i}
                         style={{
@@ -571,7 +679,7 @@ function PlateGallery2() {
                         onClick={() => setCurrentIndex(i)}
                       >
                         <img
-                          src={src.images?.[0]?.thumbnailUrl || src.images?.[0]?.url || ''}
+                          src={src.images?.[0]?.thumbnailUrl || src.images?.[0]?.url || productImages[selected._id] || ''}
                           alt={src.name?.fa || src.name?.en || `thumb-${i}`}
                           className="w-full h-auto max-h-full object-contain"
                           draggable={false}
@@ -602,18 +710,20 @@ function PlateGallery2() {
                         transform: `translateY(calc(-${currentIndex * 101}% + ${dragY}px))`,
                       }}
                     >
-                      {collectionImages.map((src, i) => (
+                      {displayImages.map((src, i) => (
                         <div
                           key={i}
                           className="flex mx-auto items-center justify-center relative h-full"
                         >
-                          <img
+                          <motion.img
+                            {...(i === 0 ? { layoutId: `product-img-${selected._id}` } : {})}
                             className="flex m-auto items-center justify-center cursor-pointer w-auto h-full object-contain"
-                            src={src.images?.[0]?.url || ''}
+                            src={src.images?.[0]?.url || productImages[selected._id] || ''}
                             alt={src.name?.fa || src.name?.en || `slide-${i}`}
                             draggable={false}
+                            transition={{ type: "spring", stiffness: 220, damping: 25 }}
                           />
-                          <p className="md:text-[18px] sm:text-[15px] font-thin absolute z-50 md:left-5 sm:left-1 bottom-16 text-[#363635]">
+                          <p className="md:text-[18px] sm:text-[15px] font-thin absolute z-50 md:left-5 sm:left-1 md:bottom-16 sm:bottom-[85px] text-[#363635]">
                             {new Intl.NumberFormat(locale === "fa" ? "fa-IR" : "en-US").format(getMinPrice(src))} {locale === "fa" ? "تومان" : "IRT"}
                           </p>
 
@@ -621,7 +731,7 @@ function PlateGallery2() {
                             initial={{ opacity: 1, y: 0 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.3, ease: "easeOut" }}
-                            className="absolute flex gap-[1px] bottom-16 md:right-5 sm:right-2 text-white cursor-pointer z-50"
+                            className="absolute flex gap-[1px] md:bottom-16 sm:bottom-[85px] md:right-5 sm:right-2 text-white cursor-pointer z-50"
                             onClick={() => {
                               const targetSlug = src.slug || src._id || src.id;
                               if (targetSlug) router.push(`/product/${targetSlug}`);
@@ -647,7 +757,8 @@ function PlateGallery2() {
                   </div>
                 </div>
               </motion.aside>
-            )}
+            );
+            })()}
           </AnimatePresence>
         </div>
       )}

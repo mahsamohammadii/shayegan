@@ -397,6 +397,20 @@ function FilterPanel({ filters, setFilters, onApply, locale, totalProducts, cate
   );
 }
 
+function getImageUrl(img) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  return (
+    img.url ||
+    img.thumbnailUrl ||
+    img.path ||
+    img.renditions?.find(r => r.name === 'medium')?.url ||
+    img.renditions?.find(r => r.name === 'large')?.url ||
+    img.renditions?.[0]?.url ||
+    ""
+  );
+}
+
 // ─── Product Card ──────────────────────────────────────────────────────────────
 function ProductCard({ product, index, locale, router }) {
   const images   = product.images?.length ? product.images : [];
@@ -406,7 +420,7 @@ function ProductCard({ product, index, locale, router }) {
   const [w, setW]           = useState(0);
   const startX  = useRef(null);
   const dragging = useRef(false);
-  const threshold = 80;
+  const threshold = 50;
 
   const start = (x) => { startX.current = x; dragging.current = true; };
   const move  = (x) => { if (!dragging.current) return; setDragX((x - startX.current) * 0.6); };
@@ -435,7 +449,11 @@ function ProductCard({ product, index, locale, router }) {
       onMouseLeave={() => setHovered(false)}
     >
       {/* Slider */}
-      <div className="relative w-full h-64 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm group-hover:shadow-md transition-shadow duration-300">
+      <div
+        ref={(el) => { if (el) setW(el.offsetWidth); }}
+        dir="ltr"
+        className="relative w-full h-64 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-sm group-hover:shadow-md transition-shadow duration-300"
+      >
         <div
           style={{ width: "100%", overflow: "hidden", touchAction: "none", userSelect: "none" }}
           onTouchStart={(e) => start(e.touches[0].clientX)}
@@ -449,24 +467,21 @@ function ProductCard({ product, index, locale, router }) {
           <motion.div
             style={{ display: "flex", cursor: "grab" }}
             animate={{ x: -(cur * w) + dragX }}
-            transition={{ type: "spring", stiffness: 80, damping: 50, mass: 1 }}
+            transition={{ type: "spring", stiffness: 120, damping: 20, mass: 0.8 }}
           >
             {images.length ? images.map((img, i) => (
-              <motion.div
+              <div
                 key={i}
-                ref={(el) => { if (el && i === 0) setW(el.offsetWidth); }}
                 style={{ minWidth: "100%" }}
-                className="flex items-center justify-center"
-                variants={imgVar} custom={i} initial="hidden"
-                whileInView="visible" viewport={{ once: true, amount: 0.2 }}
+                className="flex items-center justify-center h-64"
               >
                 <img
-                  src={img.url || img.thumbnailUrl || ""}
+                  src={getImageUrl(img)}
                   alt={name}
                   draggable={false}
                   className="pointer-events-none h-64 md:w-[55%] sm:w-[70%] object-contain"
                 />
-              </motion.div>
+              </div>
             )) : (
               <div style={{ minWidth: "100%" }} className="flex items-center justify-center h-64 text-gray-300 text-sm">
                 {locale === "fa" ? "بدون تصویر" : "No image"}
@@ -475,11 +490,54 @@ function ProductCard({ product, index, locale, router }) {
           </motion.div>
         </div>
 
+        {/* Previous / Next buttons on hover */}
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCur((p) => Math.max(0, p - 1));
+              }}
+              disabled={cur === 0}
+              className={`absolute left-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white/80 border border-gray-200 flex items-center justify-center text-gray-700 shadow transition-opacity duration-200 ${
+                hovered && cur > 0 ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCur((p) => Math.min(images.length - 1, p + 1));
+              }}
+              disabled={cur === images.length - 1}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-white/80 border border-gray-200 flex items-center justify-center text-gray-700 shadow transition-opacity duration-200 ${
+                hovered && cur < images.length - 1 ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              ›
+            </button>
+          </>
+        )}
+
         {/* Progress dots */}
         {images.length > 1 && (
-          <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center items-center gap-1.5 z-10" dir="ltr">
             {images.map((_, i) => (
-              <span key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === cur ? "bg-[#786548] w-3" : "bg-gray-300"}`} />
+              <button
+                key={i}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCur(i);
+                }}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === cur ? "bg-[#786548] w-4" : "bg-gray-300 w-1.5 hover:bg-gray-400"
+                }`}
+                aria-label={`Go to slide ${i + 1}`}
+              />
             ))}
           </div>
         )}

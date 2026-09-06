@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useLanguage } from "../../app/contexts/LanguageContext";
 import { useContent } from "../../app/contexts/ContentContext";
 import { FaMapMarkerAlt } from "react-icons/fa";
+import Footer2 from "../layout/Footer2";
 
 export default function AboutUs() {
   const { locale } = useLanguage();
@@ -126,7 +127,7 @@ export default function AboutUs() {
 
         {/* Left side on Desktop / Bottom on Mobile — scrollable if content overflows */}
         <div className="w-full md:w-2/3 min-h-screen">
-          <div className="w-[90%] mx-auto pb-24 pt-8">
+          <div className="w-[90%] mx-auto pb-16 pt-8">
             {/* Intro Video section */}
             <h2 className="md:text-2xl text-lg font-bold text-center mb-5 text-[#363635]">
               {locale === "fa" ? "ویدیو معرفی" : "Intro Video"}
@@ -156,6 +157,11 @@ export default function AboutUs() {
           </div>
         </div>
 
+      </div>
+
+      {/* Full width Footer below both columns */}
+      <div className="w-full relative z-20">
+        <Footer2 />
       </div>
     </div>
   );

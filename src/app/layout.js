@@ -28,10 +28,37 @@ export default function RootLayout({ children }) {
     });
     function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
     requestAnimationFrame(raf);
+
+    // Prevent iOS Safari pinch/gesture zoom
+    const preventGesture = (e) => e.preventDefault();
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    document.addEventListener("gestureend", preventGesture, { passive: false });
+
+    // Prevent Ctrl/Cmd + Wheel zoom on Desktop
+    const preventWheelZoom = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("wheel", preventWheelZoom, { passive: false });
+
+    return () => {
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+      document.removeEventListener("wheel", preventWheelZoom);
+    };
   }, []);
 
   return (
     <html>
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover"
+        />
+      </head>
       <body>
         <LoginProvider>
           <CartProvider>

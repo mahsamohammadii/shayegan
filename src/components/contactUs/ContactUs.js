@@ -20,6 +20,7 @@ import {
 import { Map, Marker, ZoomControl } from "pigeon-maps";
 import { useLanguage } from "../../app/contexts/LanguageContext";
 import { useContent } from "../../app/contexts/ContentContext";
+import Footer2 from "../layout/Footer2";
 
 const SOCIAL_ICONS = {
   instagram: FaInstagram,
@@ -176,8 +177,8 @@ export default function ContactUs() {
         </div>
 
         {/* Left side on Desktop / Bottom on Mobile (Contact Details + Bio + Collaborate + Map) */}
-        <div className="w-full md:w-2/3 min-h-screen">
-          <div className="w-[92%] mx-auto pb-24 pt-8 flex flex-col gap-8">
+        <div className="w-full md:w-2/3 min-h-screen flex flex-col justify-between">
+          <div className="w-[92%] mx-auto pb-16 pt-8 flex flex-col gap-8">
             
             {/* Overview / Contact Us Body */}
             {contactUsBody && (
@@ -291,6 +292,11 @@ export default function ContactUs() {
           </div>
         </div>
 
+      </div>
+
+      {/* Full width Footer below both columns */}
+      <div className="w-full relative z-20">
+        <Footer2 />
       </div>
     </div>
   );

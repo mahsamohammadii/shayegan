@@ -1,9 +1,9 @@
 "use client"
 import Link from "next/link"
 import React, { useState, useEffect, useRef, useCallback } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from 'next/navigation'
-import { BsFillPhoneFill, BsFillEyeFill, BsHeadset } from "react-icons/bs"
+import { BsFillPhoneFill, BsFillEyeFill, BsHeadset, BsPencilSquare } from "react-icons/bs"
 import { useLanguage } from "../../app/contexts/LanguageContext"
 import { useLogin } from "../../app/contexts/LoginContext"
 import { requestOtp, verifyOtp } from "../../lib/api/auth"
@@ -74,21 +74,6 @@ export default function Login() {
     }
   }, [])
 
-  // ─── Animation variants ──────────────────────────────────────────────────────
-  const boxVariant = {
-    hidden: { opacity: 0, y: 50 },
-    visible: (i) => ({
-      opacity: 1,
-      y: 0,
-      transition: { delay: i * 0.05, duration: 0.6, ease: "easeOut" },
-    }),
-  }
-
-  const imgVariant = {
-    hidden: { opacity: 0, y: -20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
-  }
-
   // ─── Step 1: Send OTP ────────────────────────────────────────────────────────
   async function handleRequestOtp() {
     setError("")
@@ -118,12 +103,10 @@ export default function Login() {
       }
 
       if (!isSent) {
-        // SMS was not dispatched by provider -> allow immediate re-try without advancing step
         setError(res?.message || (locale === "fa" ? "در حال حاضر امکان ارسال کد نبود. لطفاً کمی بعد دوباره تلاش کنید" : "Could not send SMS code. Please try again."))
         return
       }
 
-      // SMS dispatched successfully
       setAction(1)
       const waitTime = RESEND_STEPS[Math.min(resendCount, RESEND_STEPS.length - 1)]
       startCountdown(waitTime)
@@ -191,7 +174,6 @@ export default function Login() {
       const verifyData = await verifyOtp(mobile.trim(), code.trim())
       const userData = verifyData?.user || verifyData
 
-      // Reset local counter and suspension state upon successful login
       setResendCount(0)
       setIsSuspended(false)
 
@@ -206,193 +188,273 @@ export default function Login() {
 
   // ─── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div dir={locale === "fa" ? "rtl" : "ltr"} className="w-full h-screen flex items-center justify-center">
-      <div>
-        {/* Logo */}
-        <motion.img
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.3 }}
-          variants={imgVariant}
-          src="/images/logo.png"
-          className="w-[250px] mx-auto -mt-6"
-        />
+    <div
+      dir={locale === "fa" ? "rtl" : "ltr"}
+      className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-[#FBF9F5] selection:bg-[#786548] selection:text-white"
+    >
+      <div className="w-full max-w-[440px] flex flex-col items-center">
+        {/* Logo centered above the card */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mb-6 flex flex-col items-center"
+        >
+          <Link href="/">
+            <img
+              src="/images/logo.png"
+              alt="Shayegan Design"
+              className="w-[220px] md:w-[250px] h-auto object-contain cursor-pointer transition-transform duration-300 hover:scale-105"
+            />
+          </Link>
+        </motion.div>
 
-        {/* ── Step 0: Mobile number ──────────────────────────────────────────── */}
-        {action === 0 && (
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={boxVariant}
-            className="md:w-[600px] sm:w-[90%] border border-gray-500 rounded-md p-4"
-          >
-            <h1 className="text-[#363635] text-xl text-center font-bold mt-3">
-              {locale === "fa" ? "ورود" : "Login"}
-            </h1>
-
-            <div className="credentials-panel mt-5">
-              <div className="field-wrapper">
-                <input
-                  maxLength={11}
-                  minLength={11}
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  disabled={isSuspended}
-                  required
-                  className="bg-tranparent outline-none text-right disabled:opacity-50"
-                />
-                <label>{locale === "fa" ? "شماره موبایل" : "Phone number"}</label>
-                <BsFillPhoneFill />
-              </div>
-            </div>
-
-            <label className="flex items-center space-x-1 text-[15px] mt-4 mb-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={e => setRemember(e.target.checked)}
-              />
-              <span className="pr-0.5 text-sm text-[#363635]">
-                {locale === "fa" ? "مرا بخاطر بسپار" : "Remember me"}
-              </span>
-            </label>
-
-            <p className="text-xs text-zinc-500">
-              {locale === "fa" ? "ورود شما به معنای" : "Login"}{" "}
-              <Link href="/regulations" className="text-[#363635]">
-                {locale === "fa" ? "پذیرش شرایط آدرینیکس" : ""}
-              </Link>{" "}
-              {locale === "fa" ? "و" : "and"}{" "}
-              <Link href="/regulations" className="text-[#363635]">
-                {locale === "fa" ? "قوانین حریم‌خصوصی" : ""}
-              </Link>{" "}
-              {locale === "fa" ? "است." : ""}
-            </p>
-
-            {/* Error message */}
-            {error && (
-              <p className="mt-3 text-sm text-red-600 text-center">{error}</p>
-            )}
-
-            {/* 403 Device Suspended Banner */}
-            {isSuspended && (
-              <div className="mt-4 p-4 rounded-md border border-red-500 bg-red-50 text-red-800 text-sm text-center">
-                <p className="font-bold mb-2">
-                  {suspendedMessage || (locale === "fa" 
-                    ? "درخواست کد از این دستگاه بیش از حد مجاز است. لطفاً با پشتیبانی سایت تماس بگیرید."
-                    : "Too many requests from this device. Please contact site support.")}
-                </p>
-                <div className="flex justify-center items-center gap-2 mt-3">
-                  <Link href="/contactUs" className="bg-[#363635] text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-1 hover:bg-black transition-colors">
-                    <BsHeadset className="text-sm" />
-                    {locale === "fa" ? "تماس با پشتیبانی" : "Contact Support"}
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            <button
-              onClick={handleRequestOtp}
-              disabled={isLoading || isSuspended}
-              className="bg-[#363635] py-2 text-sm text-white w-full text-center rounded-sm mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? (locale === "fa" ? "در حال ارسال..." : "Sending...")
-                : (locale === "fa" ? "ارسال کد" : "Send code")}
-            </button>
-          </motion.div>
-        )}
-
-        {/* ── Step 1: OTP verification ───────────────────────────────────────── */}
-        {action === 1 && (
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={boxVariant}
-            className="md:w-[600px] sm:w-[90%] border border-gray-500 rounded-md p-4"
-          >
-            <h1 className="text-[#363635] text-[18px] font-bold mt-3">
-              {locale === "fa" ? "در حال ارسال کد به شماره" : "Sending code to"}{" "}
-              {mobile}
-            </h1>
-
-            {/* Edit mobile — goes back to step 0 */}
-            <button
-              className="my-3 border border-[#363635] rounded-[5px] p-2 text-[#363635] text-[14px] hover:bg-[#36363520]"
-              onClick={() => { setAction(0); setError(""); setInfoMessage(""); setCode("") }}
-            >
-              {locale === "fa" ? "اصلاح شماره موبایل" : "Edit phone number"}
-            </button>
-
-            <div className="credentials-panel mt-5">
-              <div className="field-wrapper">
-                <input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  disabled={isSuspended}
-                  required
-                  maxLength={6}
-                  className="bg-tranparent outline-none text-right disabled:opacity-50"
-                />
-                <label>{locale === "fa" ? "کد تأیید" : "OTP Code"}</label>
-                <BsFillEyeFill />
-              </div>
-            </div>
-
-            {/* Error & Info messages */}
-            {error && (
-              <p className="mt-3 text-sm text-red-600 text-center">{error}</p>
-            )}
-            {infoMessage && (
-              <p className="mt-3 text-sm text-emerald-700 text-center">{infoMessage}</p>
-            )}
-
-            {/* 403 Device Suspended Banner */}
-            {isSuspended && (
-              <div className="mt-4 p-4 rounded-md border border-red-500 bg-red-50 text-red-800 text-sm text-center">
-                <p className="font-bold mb-2">
-                  {suspendedMessage || (locale === "fa" 
-                    ? "درخواست کد از این دستگاه بیش از حد مجاز است. لطفاً با پشتیبانی سایت تماس بگیرید."
-                    : "Too many requests from this device. Please contact site support.")}
-                </p>
-                <div className="flex justify-center items-center gap-2 mt-3">
-                  <Link href="/contactUs" className="bg-[#363635] text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-1 hover:bg-black transition-colors">
-                    <BsHeadset className="text-sm" />
-                    {locale === "fa" ? "تماس با پشتیبانی" : "Contact Support"}
-                  </Link>
-                </div>
-              </div>
-            )}
-
-            {/* Resend OTP with Stepped Countdown */}
-            <div className="mt-4 flex items-center gap-2">
-              <button
-                onClick={handleResendOtp}
-                disabled={countdown > 0 || isLoading || isSuspended}
-                className="text-sm text-[#363635] underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed"
+        {/* Auth Card Container */}
+        <motion.div
+          initial={{ opacity: 0, y: 30, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="w-full bg-white rounded-2xl border border-stone-200/80 shadow-[0_12px_35px_-10px_rgba(54,54,53,0.08)] p-6 md:p-8"
+        >
+          <AnimatePresence mode="wait">
+            {action === 0 ? (
+              <motion.div
+                key="step-mobile"
+                initial={{ opacity: 0, x: locale === "fa" ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: locale === "fa" ? -20 : 20 }}
+                transition={{ duration: 0.3 }}
+                className="w-full flex flex-col"
               >
-                {locale === "fa" ? "ارسال مجدد کد" : "Resend code"}
-              </button>
-              {countdown > 0 && (
-                <span className="text-xs text-zinc-600 font-medium">
-                  ({formatCountdown(countdown, locale)})
-                </span>
-              )}
-            </div>
+                <h1 className="text-[#363635] text-xl font-bold text-center mb-1">
+                  {locale === "fa" ? "ورود / ثبت‌نام" : "Login / Register"}
+                </h1>
+                <p className="text-stone-500 text-xs text-center mb-6">
+                  {locale === "fa"
+                    ? "لطفاً شماره موبایل خود را وارد کنید"
+                    : "Please enter your phone number to proceed"}
+                </p>
 
-            <button
-              onClick={handleVerifyOtp}
-              disabled={isLoading || isSuspended}
-              className="bg-[#363635] py-2 text-sm text-white w-full text-center rounded-sm mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading
-                ? (locale === "fa" ? "در حال بررسی..." : "Verifying...")
-                : (locale === "fa" ? "وارد شوید" : "Login")}
-            </button>
-          </motion.div>
-        )}
+                {/* Mobile input form */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleRequestOtp();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-[#363635]">
+                      {locale === "fa" ? "شماره موبایل" : "Phone Number"}
+                    </label>
+                    <div className="relative flex items-center border border-stone-300 rounded-xl bg-stone-50/50 focus-within:border-[#363635] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#363635]/10 transition-all duration-200 px-3.5 py-2.5">
+                      <BsFillPhoneFill className="text-stone-400 text-lg ml-2 flex-shrink-0" />
+                      <input
+                        type="tel"
+                        maxLength={11}
+                        minLength={11}
+                        value={mobile}
+                        onChange={(e) => setMobile(e.target.value)}
+                        disabled={isSuspended}
+                        placeholder={locale === "fa" ? "۰۹۱۲۳۴۵۶۷۸۹" : "09123456789"}
+                        dir="ltr"
+                        required
+                        className="w-full bg-transparent text-left outline-none text-stone-800 text-sm font-mono tracking-wider placeholder:text-stone-400 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="checkbox"
+                      id="rememberMe"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      className="w-4 h-4 rounded border-stone-300 text-[#363635] focus:ring-[#363635] accent-[#363635] cursor-pointer"
+                    />
+                    <label
+                      htmlFor="rememberMe"
+                      className="text-xs text-stone-600 select-none cursor-pointer"
+                    >
+                      {locale === "fa" ? "مرا بخاطر بسپار" : "Remember me"}
+                    </label>
+                  </div>
+
+                  <p className="text-[11px] text-stone-400 leading-relaxed pt-1">
+                    {locale === "fa" ? "ورود شما به معنای" : "By continuing, you accept"}{" "}
+                    <Link href="/regulations" className="text-[#363635] font-semibold underline underline-offset-2">
+                      {locale === "fa" ? "پذیرش شرایط آدرینیکس" : "Terms & Conditions"}
+                    </Link>{" "}
+                    {locale === "fa" ? "و" : "and"}{" "}
+                    <Link href="/regulations" className="text-[#363635] font-semibold underline underline-offset-2">
+                      {locale === "fa" ? "قوانین حریم‌خصوصی" : "Privacy Policy"}
+                    </Link>{" "}
+                    {locale === "fa" ? "است." : "."}
+                  </p>
+
+                  {error && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs text-center font-medium">
+                      {error}
+                    </div>
+                  )}
+
+                  {isSuspended && (
+                    <div className="p-4 rounded-xl border border-red-300 bg-red-50/90 text-red-800 text-xs text-center space-y-3">
+                      <p className="font-semibold leading-relaxed">
+                        {suspendedMessage ||
+                          (locale === "fa"
+                            ? "درخواست کد از این دستگاه بیش از حد مجاز است. لطفاً با پشتیبانی سایت تماس بگیرید."
+                            : "Too many requests from this device. Please contact site support.")}
+                      </p>
+                      <Link
+                        href="/contactUs"
+                        className="inline-flex items-center justify-center gap-1.5 bg-[#363635] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors"
+                      >
+                        <BsHeadset className="text-sm" />
+                        {locale === "fa" ? "تماس با پشتیبانی" : "Contact Support"}
+                      </Link>
+                    </div>
+                  )}
+
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    type="submit"
+                    disabled={isLoading || isSuspended}
+                    className="w-full bg-[#363635] hover:bg-black text-white font-medium py-3 px-4 rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-2"
+                  >
+                    {isLoading
+                      ? (locale === "fa" ? "در حال ارسال..." : "Sending...")
+                      : (locale === "fa" ? "ارسال کد تأیید" : "Send verification code")}
+                  </motion.button>
+                </form>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="step-otp"
+                initial={{ opacity: 0, x: locale === "fa" ? -20 : 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: locale === "fa" ? 20 : -20 }}
+                transition={{ duration: 0.3 }}
+                className="w-full flex flex-col"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => {
+                      setAction(0);
+                      setError("");
+                      setInfoMessage("");
+                      setCode("");
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 hover:text-[#363635] bg-stone-100 hover:bg-stone-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <BsPencilSquare className="text-xs" />
+                    {locale === "fa" ? "اصلاح شماره" : "Edit phone"}
+                  </button>
+                  <span className="text-xs font-mono font-bold text-[#363635] dir-ltr">
+                    {mobile}
+                  </span>
+                </div>
+
+                <h1 className="text-[#363635] text-xl font-bold text-center mb-1">
+                  {locale === "fa" ? "ورود کد تأیید" : "Enter Verification Code"}
+                </h1>
+                <p className="text-stone-500 text-xs text-center mb-6">
+                  {locale === "fa"
+                    ? `کد پیامک‌شده به شماره ${mobile} را وارد کنید`
+                    : `Enter the code sent to ${mobile}`}
+                </p>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleVerifyOtp();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-[#363635]">
+                      {locale === "fa" ? "کد تأیید 6 رقمی" : "6-Digit OTP Code"}
+                    </label>
+                    <div className="relative flex items-center border border-stone-300 rounded-xl bg-stone-50/50 focus-within:border-[#363635] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#363635]/10 transition-all duration-200 px-3.5 py-2.5">
+                      <BsFillEyeFill className="text-stone-400 text-lg ml-2 flex-shrink-0" />
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={code}
+                        onChange={(e) => setCode(e.target.value)}
+                        disabled={isSuspended}
+                        placeholder="••••••"
+                        dir="ltr"
+                        required
+                        className="w-full bg-transparent text-center outline-none text-stone-900 text-lg font-mono tracking-[0.5em] placeholder:text-stone-300 disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs text-center font-medium">
+                      {error}
+                    </div>
+                  )}
+
+                  {infoMessage && (
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs text-center font-medium">
+                      {infoMessage}
+                    </div>
+                  )}
+
+                  {isSuspended && (
+                    <div className="p-4 rounded-xl border border-red-300 bg-red-50/90 text-red-800 text-xs text-center space-y-3">
+                      <p className="font-semibold leading-relaxed">
+                        {suspendedMessage ||
+                          (locale === "fa"
+                            ? "درخواست کد از این دستگاه بیش از حد مجاز است. لطفاً با پشتیبانی سایت تماس بگیرید."
+                            : "Too many requests from this device. Please contact site support.")}
+                      </p>
+                      <Link
+                        href="/contactUs"
+                        className="inline-flex items-center justify-center gap-1.5 bg-[#363635] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-black transition-colors"
+                      >
+                        <BsHeadset className="text-sm" />
+                        {locale === "fa" ? "تماس با پشتیبانی" : "Contact Support"}
+                      </Link>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={countdown > 0 || isLoading || isSuspended}
+                      className="text-xs font-medium text-[#363635] hover:underline disabled:opacity-40 disabled:no-underline disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {locale === "fa" ? "ارسال مجدد کد" : "Resend code"}
+                    </button>
+
+                    {countdown > 0 && (
+                      <span className="text-xs font-mono text-stone-500">
+                        {formatCountdown(countdown, locale)}
+                      </span>
+                    )}
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    type="submit"
+                    disabled={isLoading || isSuspended}
+                    className="w-full bg-[#363635] hover:bg-black text-white font-medium py-3 px-4 rounded-xl text-sm transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer mt-2"
+                  >
+                    {isLoading
+                      ? (locale === "fa" ? "در حال بررسی..." : "Verifying...")
+                      : (locale === "fa" ? "تأیید و ورود" : "Verify & Login")}
+                  </motion.button>
+                </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   )

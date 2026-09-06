@@ -20,7 +20,15 @@ export async function apiFetch(endpoint, options = {}) {
   if (!cleanEndpoint.startsWith('http') && !cleanEndpoint.startsWith('/')) {
     cleanEndpoint = `/${cleanEndpoint}`;
   }
-  const url = cleanEndpoint.startsWith('http') ? cleanEndpoint : `${API_URL}${cleanEndpoint}`;
+  const SERVER_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'https://api.shayegandesign.com').trim();
+  let url;
+  if (cleanEndpoint.startsWith('http')) {
+    url = cleanEndpoint;
+  } else if (typeof window === 'undefined') {
+    url = `${SERVER_BASE_URL}${cleanEndpoint}`;
+  } else {
+    url = `${API_URL}${cleanEndpoint}`;
+  }
 
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
